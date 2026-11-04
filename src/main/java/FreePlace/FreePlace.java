@@ -14,7 +14,7 @@ import mindustry.core.World;
 import mindustry.entities.units.BuildPlan;
 import mindustry.game.EventType;
 import mindustry.input.DesktopInput;
-import mindustry.input.Input;
+import mindustry.input.InputHandler;
 import mindustry.input.MobileInput;
 import mindustry.input.PlaceMode;
 import mindustry.world.Block;
@@ -95,7 +95,7 @@ public final class FreePlace {
         if (Vars.headless || Vars.ui == null) {
             return;
         }
-        Input in = Vars.control == null ? null : Vars.control.input;
+        InputHandler in = Vars.control == null ? null : Vars.control.input;
         // 先做最便宜的判断：不满足条件的帧连鼠标坐标都不取。
         if (in == null
                 || !ModSettings.freePlaceEnabled()
@@ -178,7 +178,7 @@ public final class FreePlace {
     }
 
     /** 起笔：清状态 + 铺第一格；第一格放不下也不卡死，交给 draw() 再起。 */
-    private static void begin(Input in, Block block, int rotation, int seedX, int seedY) {
+    private static void begin(InputHandler in, Block block, int rotation, int seedX, int seedY) {
         trail.clear();
         occupied.clear();
         in.linePlans.clear();
@@ -192,7 +192,7 @@ public final class FreePlace {
     }
 
     /** 本帧真正的工作：查回退 → 补线 → 增量重排朝向 → 同步给 linePlans。 */
-    private static void draw(Input in, Block block, int rotation, boolean overrideRotation, int tx, int ty) {
+    private static void draw(InputHandler in, Block block, int rotation, boolean overrideRotation, int tx, int ty) {
         // 目标格和上一帧一样：什么都不会变，只确认一次 linePlans 没被游戏清掉。
         if (tx == committedX && ty == committedY) {
             sync(in.linePlans);
