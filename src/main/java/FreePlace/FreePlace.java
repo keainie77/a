@@ -17,13 +17,14 @@ import mindustry.input.DesktopInput;
 import mindustry.input.InputHandler;
 import mindustry.input.MobileInput;
 import mindustry.input.PlaceMode;
+import mindustry.mod.Mod;
 import mindustry.world.Block;
 import mindustry.world.Tile;
 
 /**
  * 自由放置：拖动建造时按指针轨迹逐格规划，像画笔一样连线，沿原路拖回去可以缩回。
  *
- * 本版针对手机（Mindustry v160.x / MindustryX）做了以下优化，手感与旧版一致：
+ * 独立 mod（继承 mindustry.mod.Mod），移动端（Mindustry v160.x / MindustryX）优化：
  *
  *  1) 每帧只算「真的变了」的那部分：指针还停在同一格时整帧直接返回，
  *     只做一次 O(1) 的同步检查，不再每帧把整条笔迹重建一遍。
@@ -39,7 +40,10 @@ import mindustry.world.Tile;
  *  6) 线内部一律用 trail.items[] 直读，省掉迭代器与 for-each 装箱。
  *  7) 起笔格放不下时不再把自己卡死，会自动从第一个能放的格子起笔。
  */
-public final class FreePlace {
+public class FreePlace extends Mod {
+    /** 设置项 key（默认开启）。 */
+    private static final String SETTING_KEY = "tweakermdt-freeplace-enabled";
+
     /** 单条笔迹最多多少格。 */
     private static final int MAX_POINTS = 4096;
     /**
@@ -51,7 +55,6 @@ public final class FreePlace {
     private static final Seq<BuildPlan> trail = new Seq<>();
     private static final IntSet occupied = new IntSet();
     private static final ObjectMap<Class<?>, Boolean> customPath = new ObjectMap<>();
-    private static final KeyEdge keys = new KeyEdge();
 
     private static boolean dragging;
     private static int failures;
@@ -68,27 +71,40 @@ public final class FreePlace {
     private static int aimTileX;
     private static int aimTileY;
 
-    private FreePlace() {
+    @Override
+    public void loadContent() {
+        setup();
     }
 
-    public static void init() {
+    public static void setup() {
         if (Vars.headless) {
             return;
         }
         Events.run(EventType.Trigger.update, FreePlace::update);
-        Log.info("[tweakermdt] 自由放置已就绪（拖动时按鼠标轨迹规划，按 F1 开关）");
+        Log.info("[FreePlace] 自由放置已就绪（拖动时按指针轨迹规划）");
     }
 
+    /** 开关自由放置；默认开启。想接快捷键 / 设置项时调用它即可。 */
     public static void toggle() {
-        boolean on = !ModSettings.freePlaceEnabled();
-        Core.settings.put(ModSettings.FREEPLACE_ENABLED, Boolean.valueOf(on));
+        boolean on = !freePlaceEnabled();
+        Core.settings.put(SETTING_KEY, Boolean.valueOf(on));
         if (!on) {
             reset();
             if (Vars.control != null && Vars.control.input != null) {
                 Vars.control.input.linePlans.clear();
             }
         }
-        Notify.show(Core.bundle.get(on ? "tweakermdt.notify.freeplace.on" : "tweakermdt.notify.freeplace.off"));
+        notify(on ? "自由放置：已开启（拖动即画笔）" : "自由放置：已关闭");
+    }
+
+    private static boolean freePlaceEnabled() {
+        return Core.settings.getBool(SETTING_KEY, true);
+    }
+
+    private static void notify(String text) {
+        if (Vars.ui != null && Vars.ui.hudfrag != null) {
+            Vars.ui.hudfrag.showToast(text);
+        }
     }
 
     private static void update() {
@@ -98,7 +114,7 @@ public final class FreePlace {
         InputHandler in = Vars.control == null ? null : Vars.control.input;
         // 先做最便宜的判断：不满足条件的帧连鼠标坐标都不取。
         if (in == null
-                || !ModSettings.freePlaceEnabled()
+                || !freePlaceEnabled()
                 || Vars.state == null
                 || !Vars.state.isGame()
                 || Vars.player == null
@@ -118,7 +134,7 @@ public final class FreePlace {
         } catch (Throwable t) {
             reset();
             if (failures++ % 120 == 0) {
-                Log.err("[tweakermdt] 自由放置执行失败", t);
+                Log.err("[FreePlace] 自由放置执行失败", t);
             }
         }
     }
